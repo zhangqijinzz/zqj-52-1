@@ -44,22 +44,17 @@ export default function Questions() {
     return map;
   }, [answers]);
 
-  const matchedQuestions = useMemo(() => {
-    if (!searchQuery.trim()) return null;
-    const query = searchQuery.toLowerCase();
-    return questions.filter((q) => {
-      const answer = answerMap.get(q.id);
-      const matchQuestion = q.content.toLowerCase().includes(query);
-      const matchAnswer = answer?.content?.toLowerCase().includes(query) || false;
-      const matchHint = q.hint?.toLowerCase().includes(query) || false;
-      return matchQuestion || matchAnswer || matchHint;
-    });
-  }, [searchQuery, questions, answerMap]);
-
   const displayQuestions = useMemo(() => {
     let result = questions;
-    if (matchedQuestions) {
-      result = matchedQuestions;
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      result = result.filter((q) => {
+        const answer = answerMap.get(q.id);
+        const matchQuestion = q.content.toLowerCase().includes(query);
+        const matchAnswer = answer?.content?.toLowerCase().includes(query) || false;
+        const matchHint = q.hint?.toLowerCase().includes(query) || false;
+        return matchQuestion || matchAnswer || matchHint;
+      });
     }
     if (showFavorites) {
       result = result.filter((q) => {
@@ -68,17 +63,19 @@ export default function Questions() {
       });
     }
     return result;
-  }, [questions, matchedQuestions, showFavorites, answerMap]);
+  }, [questions, searchQuery, showFavorites, answerMap]);
+
+  const isSearching = searchQuery.trim().length > 0;
 
   useEffect(() => {
-    if (matchedQuestions && matchedQuestions.length > 0) {
+    if (isSearching && displayQuestions.length > 0) {
       setCurrentMatchIndex(0);
-      setHighlightedId(matchedQuestions[0].id);
+      setHighlightedId(displayQuestions[0].id);
     } else {
       setHighlightedId(null);
       setCurrentMatchIndex(0);
     }
-  }, [matchedQuestions]);
+  }, [displayQuestions, isSearching]);
 
   useEffect(() => {
     if (highlightedId) {
@@ -93,12 +90,12 @@ export default function Questions() {
   }, [highlightedId]);
 
   const navigateMatch = (direction: 'prev' | 'next') => {
-    if (!matchedQuestions || matchedQuestions.length === 0) return;
+    if (displayQuestions.length === 0) return;
     const newIndex = direction === 'next'
-      ? (currentMatchIndex + 1) % matchedQuestions.length
-      : (currentMatchIndex - 1 + matchedQuestions.length) % matchedQuestions.length;
+      ? (currentMatchIndex + 1) % displayQuestions.length
+      : (currentMatchIndex - 1 + displayQuestions.length) % displayQuestions.length;
     setCurrentMatchIndex(newIndex);
-    setHighlightedId(matchedQuestions[newIndex].id);
+    setHighlightedId(displayQuestions[newIndex].id);
   };
 
   const clearSearch = () => {
@@ -153,17 +150,17 @@ export default function Questions() {
               </button>
             )}
           </div>
-          {matchedQuestions && (
+          {isSearching && (
             <div className="flex items-center justify-between mt-3 px-1">
               <span className="text-sm text-brown-500">
-                {matchedQuestions.length > 0
-                  ? `找到 ${matchedQuestions.length} 个匹配结果`
+                {displayQuestions.length > 0
+                  ? `找到 ${displayQuestions.length} 个匹配结果`
                   : '没有找到匹配的内容'}
               </span>
-              {matchedQuestions.length > 0 && (
+              {displayQuestions.length > 0 && (
                 <div className="flex items-center gap-2">
                   <span className="text-sm text-brown-500">
-                    {currentMatchIndex + 1} / {matchedQuestions.length}
+                    {currentMatchIndex + 1} / {displayQuestions.length}
                   </span>
                   <div className="flex gap-1">
                     <button
@@ -253,10 +250,9 @@ export default function Questions() {
         <div className="flex items-center gap-2 mb-6">
           <Filter className="w-5 h-5 text-brown-400" />
           <span className="text-brown-500">
-            {searchQuery
-              ? `搜索结果共 ${displayQuestions.length} 个匹配`
-              : `共 ${displayQuestions.length} 个问题`}
-            {showFavorites && !searchQuery && '（仅收藏）'}
+            {isSearching
+              ? `搜索结果共 ${displayQuestions.length} 个匹配${showFavorites ? '（仅收藏）' : ''}`
+              : `共 ${displayQuestions.length} 个问题${showFavorites ? '（仅收藏）' : ''}`}
           </span>
         </div>
 
@@ -264,13 +260,13 @@ export default function Questions() {
           <div className="text-center py-20">
             <BookOpen className="w-16 h-16 text-brown-200 mx-auto mb-4" />
             <p className="text-brown-400">
-              {searchQuery
+              {isSearching
                 ? '没有找到包含该关键词的问题或回答'
                 : showFavorites
                   ? '还没有收藏的问题'
                   : '该分类下暂无问题'}
             </p>
-            {searchQuery && (
+            {isSearching && (
               <button
                 onClick={clearSearch}
                 className="mt-4 inline-flex items-center gap-1.5 px-4 py-2 rounded-xl border border-brown-200 text-brown-600 font-medium hover:bg-brown-50 transition-colors"
