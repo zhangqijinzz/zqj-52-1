@@ -1,5 +1,5 @@
-import { useState, useMemo } from 'react';
-import { Shuffle, Filter, Heart, BookOpen } from 'lucide-react';
+import { useState, useMemo, useRef, useEffect } from 'react';
+import { Shuffle, Filter, Heart, BookOpen, Search, X, ChevronUp, ChevronDown } from 'lucide-react';
 import Layout from '@/components/Layout';
 import QuestionCard from '@/components/QuestionCard';
 import { useStore } from '@/store/useStore';
@@ -29,6 +29,10 @@ export default function Questions() {
     id: string;
     visible: boolean;
   }>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [highlightedId, setHighlightedId] = useState<string | null>(null);
+  const [currentMatchIndex, setCurrentMatchIndex] = useState(0);
+  const cardRefs = useRef<Map<string, HTMLDivElement>>(new Map());
 
   const questions = useMemo(() => {
     return getQuestionsByCategory(currentCategory as QuestionCategory | 'all');
@@ -40,15 +44,68 @@ export default function Questions() {
     return map;
   }, [answers]);
 
+  const matchedQuestions = useMemo(() => {
+    if (!searchQuery.trim()) return null;
+    const query = searchQuery.toLowerCase();
+    return questions.filter((q) => {
+      const answer = answerMap.get(q.id);
+      const matchQuestion = q.content.toLowerCase().includes(query);
+      const matchAnswer = answer?.content?.toLowerCase().includes(query) || false;
+      const matchHint = q.hint?.toLowerCase().includes(query) || false;
+      return matchQuestion || matchAnswer || matchHint;
+    });
+  }, [searchQuery, questions, answerMap]);
+
   const displayQuestions = useMemo(() => {
+    let result = questions;
+    if (matchedQuestions) {
+      result = matchedQuestions;
+    }
     if (showFavorites) {
-      return questions.filter((q) => {
+      result = result.filter((q) => {
         const a = answerMap.get(q.id);
         return a?.favorite;
       });
     }
-    return questions;
-  }, [questions, showFavorites, answerMap]);
+    return result;
+  }, [questions, matchedQuestions, showFavorites, answerMap]);
+
+  useEffect(() => {
+    if (matchedQuestions && matchedQuestions.length > 0) {
+      setCurrentMatchIndex(0);
+      setHighlightedId(matchedQuestions[0].id);
+    } else {
+      setHighlightedId(null);
+      setCurrentMatchIndex(0);
+    }
+  }, [matchedQuestions]);
+
+  useEffect(() => {
+    if (highlightedId) {
+      const timer = setTimeout(() => {
+        const el = cardRefs.current.get(highlightedId);
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [highlightedId]);
+
+  const navigateMatch = (direction: 'prev' | 'next') => {
+    if (!matchedQuestions || matchedQuestions.length === 0) return;
+    const newIndex = direction === 'next'
+      ? (currentMatchIndex + 1) % matchedQuestions.length
+      : (currentMatchIndex - 1 + matchedQuestions.length) % matchedQuestions.length;
+    setCurrentMatchIndex(newIndex);
+    setHighlightedId(matchedQuestions[newIndex].id);
+  };
+
+  const clearSearch = () => {
+    setSearchQuery('');
+    setHighlightedId(null);
+    setCurrentMatchIndex(0);
+  };
 
   const handleRandomQuestion = () => {
     const category = currentCategory === 'all' ? undefined : (currentCategory as QuestionCategory);
@@ -75,6 +132,59 @@ export default function Questions() {
           <p className="text-brown-500">
             选择一个主题，或随机抽取一个问题，开始今天的故事采集
           </p>
+        </div>
+
+        <div className="max-w-2xl mx-auto mb-6">
+          <div className="relative">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-brown-400" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="搜索问题或回答内容..."
+              className="w-full pl-12 pr-10 py-3 rounded-xl border border-brown-200 bg-white text-brown-800 placeholder:text-brown-400 focus:outline-none focus:ring-2 focus:ring-brown-300 focus:border-transparent shadow-sm"
+            />
+            {searchQuery && (
+              <button
+                onClick={clearSearch}
+                className="absolute right-4 top-1/2 -translate-y-1/2 p-1 rounded-lg hover:bg-brown-100 text-brown-400 hover:text-brown-600 transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            )}
+          </div>
+          {matchedQuestions && (
+            <div className="flex items-center justify-between mt-3 px-1">
+              <span className="text-sm text-brown-500">
+                {matchedQuestions.length > 0
+                  ? `找到 ${matchedQuestions.length} 个匹配结果`
+                  : '没有找到匹配的内容'}
+              </span>
+              {matchedQuestions.length > 0 && (
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-brown-500">
+                    {currentMatchIndex + 1} / {matchedQuestions.length}
+                  </span>
+                  <div className="flex gap-1">
+                    <button
+                      onClick={() => navigateMatch('prev')}
+                      className="p-1.5 rounded-lg border border-brown-200 text-brown-500 hover:bg-brown-50 hover:text-brown-700 transition-colors"
+                      title="上一个"
+                    >
+                      <ChevronUp className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => navigateMatch('next')}
+                      className="p-1.5 rounded-lg border border-brown-200 text-brown-500 hover:bg-brown-50 hover:text-brown-700 transition-colors"
+                      title="下一个"
+                    >
+                      <ChevronDown className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         <div className="flex flex-wrap gap-3 justify-center mb-6">
@@ -143,8 +253,10 @@ export default function Questions() {
         <div className="flex items-center gap-2 mb-6">
           <Filter className="w-5 h-5 text-brown-400" />
           <span className="text-brown-500">
-            共 <span className="font-semibold text-brown-700">{displayQuestions.length}</span>{' '}
-            个问题
+            {searchQuery
+              ? `搜索结果共 ${displayQuestions.length} 个匹配`
+              : `共 ${displayQuestions.length} 个问题`}
+            {showFavorites && !searchQuery && '（仅收藏）'}
           </span>
         </div>
 
@@ -152,15 +264,36 @@ export default function Questions() {
           <div className="text-center py-20">
             <BookOpen className="w-16 h-16 text-brown-200 mx-auto mb-4" />
             <p className="text-brown-400">
-              {showFavorites ? '还没有收藏的问题' : '该分类下暂无问题'}
+              {searchQuery
+                ? '没有找到包含该关键词的问题或回答'
+                : showFavorites
+                  ? '还没有收藏的问题'
+                  : '该分类下暂无问题'}
             </p>
+            {searchQuery && (
+              <button
+                onClick={clearSearch}
+                className="mt-4 inline-flex items-center gap-1.5 px-4 py-2 rounded-xl border border-brown-200 text-brown-600 font-medium hover:bg-brown-50 transition-colors"
+              >
+                <X className="w-4 h-4" />
+                清除搜索
+              </button>
+            )}
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {displayQuestions.map((question, index) => (
               <div
                 key={question.id}
-                className="animate-slide-up"
+                ref={(el) => {
+                  if (el) {
+                    cardRefs.current.set(question.id, el);
+                  }
+                }}
+                className={cn(
+                  'animate-slide-up',
+                  highlightedId === question.id && 'z-10'
+                )}
                 style={{ animationDelay: `${index * 50}ms` }}
               >
                 <QuestionCard
@@ -173,6 +306,8 @@ export default function Questions() {
                     const a = answerMap.get(question.id);
                     if (a) toggleFavorite(a.id);
                   }}
+                  highlighted={highlightedId === question.id}
+                  searchQuery={searchQuery}
                 />
               </div>
             ))}

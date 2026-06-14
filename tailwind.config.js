@@ -62,6 +62,7 @@ export default {
         'fade-in': 'fadeIn 0.6s ease-out',
         'slide-up': 'slideUp 0.5s ease-out',
         'float': 'float 6s ease-in-out infinite',
+        'pulse-ring': 'pulseRing 1.5s ease-out',
       },
       keyframes: {
         fadeIn: {
@@ -75,6 +76,10 @@ export default {
         float: {
           '0%, 100%': { transform: 'translateY(0px)' },
           '50%': { transform: 'translateY(-10px)' },
+        },
+        pulseRing: {
+          '0%': { boxShadow: '0 0 0 0 rgba(251, 191, 36, 0.7)' },
+          '100%': { boxShadow: '0 0 0 20px rgba(251, 191, 36, 0)' },
         },
       },
     },

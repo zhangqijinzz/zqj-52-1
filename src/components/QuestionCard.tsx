@@ -10,6 +10,8 @@ interface QuestionCardProps {
   onSaveAnswer: (content: string, favorite: boolean, year?: string) => void;
   onToggleFavorite?: () => void;
   onDeleteAnswer?: () => void;
+  highlighted?: boolean;
+  searchQuery?: string;
 }
 
 export default function QuestionCard({
@@ -17,11 +19,39 @@ export default function QuestionCard({
   existingAnswer,
   onSaveAnswer,
   onToggleFavorite,
+  highlighted = false,
+  searchQuery = '',
 }: QuestionCardProps) {
   const [isFlipped, setIsFlipped] = useState(false);
   const [answerContent, setAnswerContent] = useState(existingAnswer?.content || '');
   const [year, setYear] = useState(existingAnswer?.year || '');
   const [isFavorite, setIsFavorite] = useState(existingAnswer?.favorite || false);
+
+  const highlightText = (text: string, query: string): (string | JSX.Element)[] => {
+    if (!query.trim()) return [text];
+    const lowerText = text.toLowerCase();
+    const lowerQuery = query.toLowerCase();
+    const parts: (string | JSX.Element)[] = [];
+    let lastIndex = 0;
+    let index = lowerText.indexOf(lowerQuery);
+    let key = 0;
+    while (index !== -1) {
+      if (index > lastIndex) {
+        parts.push(text.slice(lastIndex, index));
+      }
+      parts.push(
+        <mark key={key++} className="bg-amber-200 text-amber-900 rounded px-0.5">
+          {text.slice(index, index + query.length)}
+        </mark>
+      );
+      lastIndex = index + query.length;
+      index = lowerText.indexOf(lowerQuery, lastIndex);
+    }
+    if (lastIndex < text.length) {
+      parts.push(text.slice(lastIndex));
+    }
+    return parts.length > 0 ? parts : [text];
+  };
 
   const handleFlip = () => {
     setIsFlipped(!isFlipped);
@@ -35,7 +65,7 @@ export default function QuestionCard({
   const categoryColor = categoryColors[question.category];
 
   return (
-    <div className="perspective h-80">
+    <div className={cn('perspective h-80 scroll-mt-32', highlighted && 'animate-pulse-ring')}>
       <div
         className={cn(
           'relative w-full h-full transition-transform duration-700 preserve-3d cursor-pointer',
@@ -44,7 +74,10 @@ export default function QuestionCard({
         onClick={handleFlip}
       >
         <div className="absolute inset-0 backface-hidden">
-          <div className="h-full bg-white rounded-2xl p-6 shadow-card hover:shadow-card-hover transition-shadow border border-brown-100/50 flex flex-col">
+          <div className={cn(
+            'h-full bg-white rounded-2xl p-6 shadow-card hover:shadow-card-hover transition-all border flex flex-col',
+            highlighted ? 'border-amber-400 ring-4 ring-amber-200/60' : 'border-brown-100/50'
+          )}>
             <div className="flex items-start justify-between mb-4">
               <span className={cn('px-3 py-1 rounded-full text-xs font-medium', categoryColor)}>
                 {categoryLabels[question.category]}
@@ -69,7 +102,7 @@ export default function QuestionCard({
 
             <div className="flex-1 flex items-center">
               <h3 className="font-serif text-xl md:text-2xl text-brown-800 leading-relaxed">
-                {question.content}
+                {highlightText(question.content, searchQuery)}
               </h3>
             </div>
 
@@ -78,6 +111,15 @@ export default function QuestionCard({
                 <Edit3 className="w-4 h-4" />
                 {question.hint}
               </p>
+            )}
+
+            {searchQuery && existingAnswer?.content && existingAnswer.content.toLowerCase().includes(searchQuery.toLowerCase()) && (
+              <div className="mt-3 p-3 bg-amber-50 rounded-lg border border-amber-100">
+                <p className="text-xs text-amber-600 font-medium mb-1">回答中也有匹配：</p>
+                <p className="text-sm text-amber-800 line-clamp-2">
+                  {highlightText(existingAnswer.content, searchQuery)}
+                </p>
+              </div>
             )}
 
             <div className="mt-4 pt-4 border-t border-brown-100 flex items-center justify-between">
